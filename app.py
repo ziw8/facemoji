@@ -52,11 +52,12 @@ def _merge_face_locations(*location_groups):
     return merged
 
 
-if not environ.get("VERCEL"):
-    @app.get("/")
-    def index():
-        return send_from_directory("public", "index.html")
+@app.get("/")
+def index():
+    return send_from_directory("public", "index.html")
 
+
+if not environ.get("VERCEL"):
     @app.get("/<path:path>")
     def public_assets(path):
         return send_from_directory("public", path)
