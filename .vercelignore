@@ -1,0 +1,5 @@
+.git
+.venv
+__pycache__
+*.pyc
+page-preview.png
