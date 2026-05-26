@@ -148,7 +148,7 @@ label:focus-visible {
   margin: 0;
   max-width: 680px;
   color: var(--text);
-  font-size: clamp(4px, 2.15vw, 17px);
+  font-size: clamp(14px, 2.15vw, 17px);
   font-weight: 850;
   line-height: 1.3;
   letter-spacing: 0;
@@ -977,7 +977,10 @@ label:focus-visible {
   }
 
   .hero-title {
-    font-size: clamp(4px, 2.55vw, 13px);
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.45;
+    white-space: normal;
   }
 
   .brand-link {

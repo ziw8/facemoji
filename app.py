@@ -1,4 +1,5 @@
 from io import BytesIO
+from os import environ
 
 import numpy as np
 from flask import Flask, jsonify, request, send_from_directory
@@ -13,7 +14,7 @@ except Exception as exc:  # pragma: no cover - exercised only when dependency is
     FACE_RECOGNITION_ERROR = str(exc)
 
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+app = Flask(__name__)
 
 
 def _face_area(location):
@@ -51,9 +52,14 @@ def _merge_face_locations(*location_groups):
     return merged
 
 
-@app.get("/")
-def index():
-    return send_from_directory(".", "index.html")
+if not environ.get("VERCEL"):
+    @app.get("/")
+    def index():
+        return send_from_directory("public", "index.html")
+
+    @app.get("/<path:path>")
+    def public_assets(path):
+        return send_from_directory("public", path)
 
 
 @app.get("/api/health")

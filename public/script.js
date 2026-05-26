@@ -641,9 +641,13 @@ function fitTypingText() {
 
   title.style.fontSize = "";
 
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    return;
+  }
+
   let currentSize = parseFloat(getComputedStyle(title).fontSize);
 
-  while (title.scrollWidth > availableWidth && currentSize > 3.5) {
+  while (title.scrollWidth > availableWidth && currentSize > 12) {
     currentSize -= 0.5;
     title.style.fontSize = `${currentSize}px`;
   }
