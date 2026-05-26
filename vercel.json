@@ -3,7 +3,7 @@
   "installCommand": "python3 -m pip install --upgrade pip wheel \"setuptools<81\" && python3 -m pip install -r requirements.txt && python3 -m pip install face_recognition --no-deps",
   "rewrites": [
     {
-      "source": "/",
+      "source": "/:path((?!api/).*)",
       "destination": "/index.html"
     }
   ],
