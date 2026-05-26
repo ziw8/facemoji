@@ -2,7 +2,7 @@ from io import BytesIO
 from os import environ
 
 import numpy as np
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_from_directory
 from PIL import Image, ImageOps
 
 try:
@@ -54,6 +54,9 @@ def _merge_face_locations(*location_groups):
 
 @app.get("/")
 def index():
+    if environ.get("VERCEL"):
+        return redirect("/index.html", code=307)
+
     return send_from_directory("public", "index.html")
 
 
