@@ -1,0 +1,6 @@
+Flask
+Pillow
+numpy
+setuptools<81
+face-recognition-models
+dlib-bin

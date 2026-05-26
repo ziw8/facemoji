@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FACEMOJI</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="top-nav">
+      <a class="brand-link" href="/">FACEMOJI</a>
+      <nav class="theme-nav" aria-label="Theme">
+        <button class="theme-button" type="button" data-theme-button="light" aria-label="Light theme">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"></path>
+          </svg>
+        </button>
+        <button class="theme-button" type="button" data-theme-button="dark" aria-label="Dark theme">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.7 6.7 0 0 0 9.8 9.8Z"></path>
+          </svg>
+        </button>
+        <button class="theme-button" type="button" data-theme-button="system" aria-label="System theme">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="12" rx="2"></rect>
+            <path d="M8 20h8M12 16v4"></path>
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <main class="page-shell">
+      <header class="site-header">
+        <h1 class="hero-title">
+          <span class="gradient-text">FACEMOJI</span>
+          <span class="helps-text">helps</span>
+          <span class="typing-text" id="typingText" aria-live="polite"></span>
+        </h1>
+        <p>Upload a photo, select a face, and cover it with your favorite emoji.</p>
+      </header>
+
+      <section class="editor-card" aria-label="이모지 얼굴 가리기 편집기">
+        <div class="emoji-section">
+          <h2>Choose Emojis</h2>
+          <div class="emoji-grid" id="emojiGrid" aria-label="가릴 얼굴에 사용할 이모지">
+            <div class="emoji-chip">
+              <button class="emoji-option" type="button" aria-pressed="false">😀</button>
+              <button class="remove-emoji-button" type="button" aria-label="Remove 😀"></button>
+            </div>
+            <div class="emoji-chip">
+              <button class="emoji-option" type="button" aria-pressed="false">😎</button>
+              <button class="remove-emoji-button" type="button" aria-label="Remove 😎"></button>
+            </div>
+            <div class="emoji-chip">
+              <button class="emoji-option" type="button" aria-pressed="false">😍</button>
+              <button class="remove-emoji-button" type="button" aria-label="Remove 😍"></button>
+            </div>
+            <div class="emoji-chip">
+              <button class="emoji-option" type="button" aria-pressed="false">🥸</button>
+              <button class="remove-emoji-button" type="button" aria-label="Remove 🥸"></button>
+            </div>
+            <div class="emoji-chip">
+              <button class="emoji-option" type="button" aria-pressed="false">⭐</button>
+              <button class="remove-emoji-button" type="button" aria-label="Remove ⭐"></button>
+            </div>
+            <button class="add-emoji-button" type="button" id="addEmojiButton" aria-label="Add emoji">
+              <span aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="emoji-picker" id="emojiPicker" hidden>
+            <input id="emojiSearch" type="search" autocomplete="off" placeholder="Search emoji" aria-label="Search emoji" />
+            <div class="emoji-category-tabs" id="emojiCategoryTabs" aria-label="Emoji categories"></div>
+            <div class="emoji-selector-grid" id="emojiSelectorGrid" aria-label="Emoji selector"></div>
+          </div>
+        </div>
+
+        <div class="image-workspace" id="imageWorkspace">
+          <div class="image-panel original-panel">
+            <button class="add-face-button" type="button" id="addFaceButton" aria-label="Add face area" aria-pressed="false" hidden>
+              <span aria-hidden="true"></span>
+            </button>
+            <div class="upload-area" id="dropZone">
+              <input id="imageInput" type="file" accept="image/*" />
+              <label class="upload-state" for="imageInput" id="uploadState">
+                <span class="upload-icon" aria-hidden="true"></span>
+                <strong>Upload Image</strong>
+                <span>Select a photo or drop it here.</span>
+              </label>
+
+              <div class="canvas-wrap" id="canvasWrap" hidden>
+                <canvas id="imageCanvas"></canvas>
+                <div class="face-layer" id="faceLayer" aria-label="이모지로 가릴 얼굴 선택"></div>
+                <button class="preview-button" type="button" data-preview-source="original" aria-label="Preview uploaded image">
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                    <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+                    <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+                    <path d="M21 16v3a2 2 0 0 1-2 2h-3"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="image-panel-actions">
+              <button class="secondary-button compact-button" type="button" id="uploadNewButton" hidden>
+                Upload New
+              </button>
+            </div>
+          </div>
+
+          <div class="image-panel result-panel" id="resultPanel" hidden>
+            <div class="result-area" id="resultArea">
+              <canvas id="resultCanvas"></canvas>
+              <button class="preview-button" type="button" data-preview-source="result" aria-label="Preview result image">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                  <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>
+                  <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>
+                  <path d="M21 16v3a2 2 0 0 1-2 2h-3"></path>
+                </svg>
+              </button>
+            </div>
+            <div class="result-actions" aria-label="Result actions">
+              <button class="icon-action" type="button" id="shareButton" aria-label="Share image">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"></path>
+                </svg>
+              </button>
+              <button class="icon-action" type="button" id="downloadButton" aria-label="Download image">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 3v11"></path>
+                  <path d="m7 10 5 5 5-5"></path>
+                  <path d="M5 20h14"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="cover-button" type="button" id="coverButton" disabled>
+            Apply Emoji Cover
+          </button>
+          <button class="secondary-button" type="button" id="regenerateButton" hidden>
+            Regenerate Image
+          </button>
+          <button class="secondary-button" type="button" id="reselectButton" hidden>
+            Reselect People
+          </button>
+        </div>
+
+        <p class="status-text" id="statusText" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <div class="preview-modal" id="previewModal" hidden>
+      <button class="preview-backdrop" type="button" id="previewBackdrop" aria-label="Close preview"></button>
+      <figure class="preview-frame">
+        <button class="preview-close" type="button" id="previewClose" aria-label="Close preview">Close</button>
+        <div class="preview-image-wrap" id="previewImageWrap">
+          <button class="add-face-button preview-add-face-button" type="button" id="previewAddFaceButton" aria-label="Add face area in preview" aria-pressed="false" hidden>
+            <span aria-hidden="true"></span>
+          </button>
+          <img id="previewImage" alt="Full image preview" />
+          <div class="preview-face-layer" id="previewFaceLayer" aria-label="Preview face areas"></div>
+        </div>
+      </figure>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
