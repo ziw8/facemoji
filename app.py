@@ -1,20 +1,28 @@
 from io import BytesIO
 from os import environ
 
-import numpy as np
 from flask import Flask, jsonify, redirect, request, send_from_directory
-from PIL import Image, ImageOps
-
-try:
-    import face_recognition
-
-    FACE_RECOGNITION_ERROR = None
-except Exception as exc:  # pragma: no cover - exercised only when dependency is missing
-    face_recognition = None
-    FACE_RECOGNITION_ERROR = str(exc)
 
 
 app = Flask(__name__)
+face_recognition = None
+FACE_RECOGNITION_ERROR = None
+
+
+def _load_face_recognition():
+    global face_recognition, FACE_RECOGNITION_ERROR
+
+    if face_recognition is not None or FACE_RECOGNITION_ERROR is not None:
+        return face_recognition
+
+    try:
+        import face_recognition as loaded_face_recognition
+    except Exception as exc:  # pragma: no cover - exercised only when dependency is missing
+        FACE_RECOGNITION_ERROR = str(exc)
+        return None
+
+    face_recognition = loaded_face_recognition
+    return face_recognition
 
 
 def _face_area(location):
@@ -68,9 +76,11 @@ if not environ.get("VERCEL"):
 
 @app.get("/api/health")
 def health():
+    recognition = _load_face_recognition()
+
     return jsonify(
         {
-            "face_recognition_available": face_recognition is not None,
+            "face_recognition_available": recognition is not None,
             "error": FACE_RECOGNITION_ERROR,
         }
     )
@@ -78,7 +88,9 @@ def health():
 
 @app.post("/api/detect-faces")
 def detect_faces():
-    if face_recognition is None:
+    recognition = _load_face_recognition()
+
+    if recognition is None:
         return (
             jsonify(
                 {
@@ -91,6 +103,9 @@ def detect_faces():
             ),
             503,
         )
+
+    import numpy as np
+    from PIL import Image, ImageOps
 
     image_file = request.files.get("image")
     if image_file is None:
@@ -116,12 +131,12 @@ def detect_faces():
         detection_image = image
 
     image_array = np.asarray(detection_image)
-    locations = face_recognition.face_locations(
+    locations = recognition.face_locations(
         image_array,
         number_of_times_to_upsample=1,
         model="hog",
     )
-    detail_locations = face_recognition.face_locations(
+    detail_locations = recognition.face_locations(
         image_array,
         number_of_times_to_upsample=2,
         model="hog",

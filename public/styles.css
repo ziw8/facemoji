@@ -819,16 +819,6 @@ label:focus-visible {
   opacity: 0.38;
 }
 
-.download-link {
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: var(--line-strong);
-  text-underline-offset: 3px;
-}
-
 .icon-action {
   position: relative;
   width: 30px;

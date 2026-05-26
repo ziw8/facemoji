@@ -56,7 +56,6 @@ const typingPhrases = [
 let selectedEmojis = new Set();
 let currentObjectUrl = null;
 let currentImage = null;
-let currentFile = null;
 let detectedFaces = [];
 let selectedFaceIds = new Set();
 let imageCovered = false;
@@ -64,6 +63,8 @@ let addFaceMode = false;
 let nextFaceId = 0;
 let activePreviewSource = null;
 let activeFaceDrag = null;
+let faceRenderFrame = null;
+let resizeFrame = null;
 
 const emojiGroups = [
   {
@@ -725,7 +726,7 @@ function getVisibleEmojiChoices(query) {
 }
 
 function renderEmojiCategories() {
-  emojiCategoryTabs.innerHTML = "";
+  const fragment = document.createDocumentFragment();
 
   emojiGroups.forEach((group) => {
     const button = document.createElement("button");
@@ -735,22 +736,23 @@ function renderEmojiCategories() {
     button.textContent = group.label;
     button.classList.toggle("active", group.id === activeEmojiCategory);
     button.setAttribute("aria-pressed", String(group.id === activeEmojiCategory));
-    emojiCategoryTabs.appendChild(button);
+    fragment.appendChild(button);
   });
+
+  emojiCategoryTabs.replaceChildren(fragment);
 }
 
 function renderEmojiSelector(query = "") {
   const normalizedQuery = query.trim().toLowerCase();
   const choices = getVisibleEmojiChoices(normalizedQuery);
   const listedEmojis = getListedEmojis();
-
-  emojiSelectorGrid.innerHTML = "";
+  const fragment = document.createDocumentFragment();
 
   if (choices.length === 0) {
     const emptyState = document.createElement("p");
     emptyState.className = "emoji-selector-empty";
     emptyState.textContent = "No emoji found.";
-    emojiSelectorGrid.appendChild(emptyState);
+    emojiSelectorGrid.replaceChildren(emptyState);
     return;
   }
 
@@ -763,8 +765,10 @@ function renderEmojiSelector(query = "") {
     button.classList.toggle("is-added", listedEmojis.has(emoji));
     button.setAttribute("aria-pressed", String(selectedEmojis.has(emoji)));
     button.setAttribute("aria-label", `Add ${emoji}`);
-    emojiSelectorGrid.appendChild(button);
+    fragment.appendChild(button);
   });
+
+  emojiSelectorGrid.replaceChildren(fragment);
 }
 
 function openEmojiPicker() {
@@ -984,16 +988,14 @@ function toggleFaceSelection(faceId) {
   setStatus(
     `${selectedFaceIds.size} ${selectedFaceIds.size === 1 ? "face" : "faces"} will stay visible.`
   );
-  renderFaceButtons();
-  renderPreviewFaceButtons();
+  renderFaceLayers();
 }
 
 function removeFace(faceId) {
   detectedFaces = detectedFaces.filter((face) => face.id !== faceId);
   selectedFaceIds.delete(faceId);
   updateFaceActionState();
-  renderFaceButtons();
-  renderPreviewFaceButtons();
+  renderFaceLayers();
 
   if (detectedFaces.length === 0) {
     setStatus("Add a face area or try another image.", true);
@@ -1056,8 +1058,7 @@ function updateFaceDrag(event) {
     activeFaceDrag.startCenterY + deltaY / metrics.scale
   );
 
-  renderFaceButtons();
-  renderPreviewFaceButtons();
+  scheduleFaceLayersRender();
 }
 
 function endFaceDrag() {
@@ -1071,8 +1072,7 @@ function endFaceDrag() {
 
   if (moved) {
     setStatus("Face area moved.");
-    renderFaceButtons();
-    renderPreviewFaceButtons();
+    renderFaceLayers();
     return;
   }
 
@@ -1129,16 +1129,16 @@ function createFaceMarker(face, metrics, options = {}) {
 }
 
 function renderFaceButtons() {
-  faceLayer.innerHTML = "";
-
   if (!currentImage || imageCovered) {
+    faceLayer.replaceChildren();
     return;
   }
 
   const metrics = getCanvasMetrics();
+  const fragment = document.createDocumentFragment();
 
   detectedFaces.forEach((face) => {
-    faceLayer.appendChild(
+    fragment.appendChild(
       createFaceMarker(face, metrics, {
         isInteractive: true,
         imageElement: canvas,
@@ -1146,18 +1146,35 @@ function renderFaceButtons() {
       })
     );
   });
+
+  faceLayer.replaceChildren(fragment);
+}
+
+function renderFaceLayers() {
+  renderFaceButtons();
+  renderPreviewFaceButtons();
+}
+
+function scheduleFaceLayersRender() {
+  if (faceRenderFrame) {
+    return;
+  }
+
+  faceRenderFrame = requestAnimationFrame(() => {
+    faceRenderFrame = null;
+    renderFaceLayers();
+  });
 }
 
 function resetEditor() {
   imageInput.value = "";
   currentImage = null;
-  currentFile = null;
   detectedFaces = [];
   selectedFaceIds = new Set();
   imageCovered = false;
   nextFaceId = 0;
   setAddFaceMode(false);
-  faceLayer.innerHTML = "";
+  faceLayer.replaceChildren();
   uploadState.hidden = false;
   canvasWrap.hidden = true;
   resultPanel.hidden = true;
@@ -1212,7 +1229,6 @@ function loadImage(file) {
     URL.revokeObjectURL(currentObjectUrl);
   }
 
-  currentFile = file;
   detectedFaces = [];
   selectedFaceIds = new Set();
   imageCovered = false;
@@ -1227,12 +1243,17 @@ function loadImage(file) {
   resultPanel.hidden = true;
   imageWorkspace.classList.remove("has-result");
   dropZone.classList.remove("loaded");
-  faceLayer.innerHTML = "";
+  faceLayer.replaceChildren();
   currentObjectUrl = URL.createObjectURL(file);
 
   const image = new Image();
+  const imageUrl = currentObjectUrl;
 
   image.onload = async () => {
+    if (currentObjectUrl !== imageUrl) {
+      return;
+    }
+
     currentImage = image;
     uploadState.hidden = true;
     canvasWrap.hidden = false;
@@ -1242,13 +1263,19 @@ function loadImage(file) {
     setStatus("얼굴을 인식하는 중입니다...");
 
     try {
-      detectedFaces = (await detectFaces(currentFile)).map((face) => ({
+      const faces = await detectFaces(file);
+
+      if (currentObjectUrl !== imageUrl) {
+        return;
+      }
+
+      detectedFaces = faces.map((face) => ({
         ...face,
         manual: false,
       }));
       nextFaceId =
         detectedFaces.reduce((maxId, face) => Math.max(maxId, face.id), -1) + 1;
-      renderFaceButtons();
+      renderFaceLayers();
       updateFaceActionState();
 
       if (detectedFaces.length === 0) {
@@ -1264,6 +1291,10 @@ function loadImage(file) {
   };
 
   image.onerror = () => {
+    if (currentObjectUrl !== imageUrl) {
+      return;
+    }
+
     setStatus(messages.genericError, true);
   };
 
@@ -1308,7 +1339,7 @@ function coverFaces() {
 
   imageCovered = true;
   setAddFaceMode(false);
-  faceLayer.innerHTML = "";
+  faceLayer.replaceChildren();
   resultPanel.hidden = false;
   imageWorkspace.classList.add("has-result");
   applyImageDimensions();
@@ -1332,15 +1363,24 @@ function reselectPeople() {
   reselectButton.hidden = true;
   applyImageDimensions();
   updateFaceActionState();
-  renderFaceButtons();
+  renderFaceLayers();
   setStatus("Update the faces you want to keep visible.");
 }
 
 function downloadResult() {
-  const link = document.createElement("a");
-  link.href = resultCanvas.toDataURL("image/png");
-  link.download = "emoji-cover-face.png";
-  link.click();
+  resultCanvas.toBlob((blob) => {
+    if (!blob) {
+      setStatus(messages.genericError, true);
+      return;
+    }
+
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = "emoji-cover-face.png";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, "image/png");
 }
 
 async function shareResult() {
@@ -1389,14 +1429,11 @@ function addManualFace(event, imageElement = canvas) {
   detectedFaces.push(createFaceFromCenter(centerX, centerY, faceSize));
   setAddFaceMode(false);
   updateFaceActionState();
-  renderFaceButtons();
-  renderPreviewFaceButtons();
+  renderFaceLayers();
   setStatus("Face area added.");
 }
 
 function renderPreviewFaceButtons() {
-  previewFaceLayer.innerHTML = "";
-
   if (
     previewModal.hidden ||
     activePreviewSource !== "original" ||
@@ -1404,13 +1441,15 @@ function renderPreviewFaceButtons() {
     !previewImage.complete ||
     previewImage.naturalWidth === 0
   ) {
+    previewFaceLayer.replaceChildren();
     return;
   }
 
   const metrics = getLayerMetrics(previewImage, previewFaceLayer);
+  const fragment = document.createDocumentFragment();
 
   detectedFaces.forEach((face) => {
-    previewFaceLayer.appendChild(
+    fragment.appendChild(
       createFaceMarker(face, metrics, {
         isInteractive: true,
         imageElement: previewImage,
@@ -1418,6 +1457,8 @@ function renderPreviewFaceButtons() {
       })
     );
   });
+
+  previewFaceLayer.replaceChildren(fragment);
 }
 
 function openPreview(source) {
@@ -1429,11 +1470,14 @@ function openPreview(source) {
 
   activePreviewSource = source;
   previewFaceLayer.hidden = source !== "original";
-  previewFaceLayer.innerHTML = "";
+  previewFaceLayer.replaceChildren();
   previewImage.onload = () => requestAnimationFrame(renderPreviewFaceButtons);
   previewModal.hidden = false;
   updateFaceActionState();
-  previewImage.src = targetCanvas.toDataURL("image/png");
+  previewImage.src =
+    source === "original" && currentObjectUrl
+      ? currentObjectUrl
+      : targetCanvas.toDataURL("image/png");
 
   if (previewImage.complete) {
     requestAnimationFrame(renderPreviewFaceButtons);
@@ -1447,7 +1491,7 @@ function closePreview() {
   updateFaceActionState();
   previewImage.onload = null;
   previewImage.removeAttribute("src");
-  previewFaceLayer.innerHTML = "";
+  previewFaceLayer.replaceChildren();
 }
 
 emojiGrid.addEventListener("click", (event) => {
@@ -1572,12 +1616,6 @@ previewImageWrap.addEventListener("click", (event) => {
   addManualFace(event, previewImage);
 });
 
-resultArea.addEventListener("click", (event) => {
-  if (event.target.closest(".preview-button")) {
-    return;
-  }
-});
-
 previewButtons.forEach((button) => {
   button.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1623,10 +1661,16 @@ document.addEventListener("click", (event) => {
 });
 
 window.addEventListener("resize", () => {
-  fitTypingText();
-  applyImageDimensions();
-  renderFaceButtons();
-  renderPreviewFaceButtons();
+  if (resizeFrame) {
+    return;
+  }
+
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    fitTypingText();
+    applyImageDimensions();
+    renderFaceLayers();
+  });
 });
 
 applyTheme(getStoredTheme());
