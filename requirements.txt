@@ -4,3 +4,4 @@ numpy
 setuptools<81
 face-recognition-models
 dlib-bin
+pillow-heif

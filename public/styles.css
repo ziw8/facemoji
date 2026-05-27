@@ -11,7 +11,6 @@
   --button-text: #ffffff;
   --danger: #b42318;
   --focus: #2563eb;
-  --success: #16a34a;
   --brand-gradient: linear-gradient(115deg, #111111 0%, #2563eb 38%, #db2777 68%, #f59e0b 100%);
   --add-face-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M5 3l17 17-8 1.3 4.1 7-3.3 1.9-4.1-7L5 29Z' fill='%23fff' stroke='%23111' stroke-width='1.5' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='9' r='7' fill='%23111'/%3E%3Cpath d='M23 5v8M19 9h8' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 5 3, copy;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -30,7 +29,6 @@
   --button-text: #111111;
   --danger: #f87171;
   --focus: #60a5fa;
-  --success: #22c55e;
   --brand-gradient: linear-gradient(115deg, #ffffff 0%, #60a5fa 36%, #f472b6 68%, #fbbf24 100%);
 }
 
@@ -252,6 +250,7 @@ label:focus-visible {
 .emoji-option {
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   font-size: 20px;
+  touch-action: manipulation;
 }
 
 .emoji-option:hover,
@@ -297,10 +296,16 @@ label:focus-visible {
   background: currentColor;
 }
 
-.emoji-chip:hover .remove-emoji-button,
 .emoji-chip:focus-within .remove-emoji-button {
   opacity: 1;
   pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .emoji-chip:hover .remove-emoji-button {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .remove-emoji-button:hover {
@@ -524,6 +529,12 @@ label:focus-visible {
     height 180ms ease;
 }
 
+.upload-area,
+.upload-state,
+#imageCanvas {
+  cursor: pointer;
+}
+
 .upload-area.loaded,
 .result-area {
   min-height: 0;
@@ -663,11 +674,6 @@ label:focus-visible {
 
 .face-marker.dragging .face-toggle {
   cursor: grabbing;
-}
-
-.face-toggle.selected {
-  border-color: var(--success);
-  background: rgba(22, 163, 74, 0.72);
 }
 
 .remove-face-button {

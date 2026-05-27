@@ -39,7 +39,7 @@
           <span class="helps-text">helps</span>
           <span class="typing-text" id="typingText" aria-live="polite"></span>
         </h1>
-        <p>Upload a photo, select a face, and cover it with your favorite emoji.</p>
+        <p>Upload a photo, adjust face areas, and cover them with your favorite emoji.</p>
       </header>
 
       <section class="editor-card" aria-label="이모지 얼굴 가리기 편집기">
@@ -83,7 +83,7 @@
               <span aria-hidden="true"></span>
             </button>
             <div class="upload-area" id="dropZone">
-              <input id="imageInput" type="file" accept="image/*" />
+              <input id="imageInput" type="file" accept="image/*,.heic,.heif,.jpeg,.jpg,.png,.webp" />
               <label class="upload-state" for="imageInput" id="uploadState">
                 <span class="upload-icon" aria-hidden="true"></span>
                 <strong>Upload Image</strong>
@@ -150,7 +150,7 @@
             Regenerate Image
           </button>
           <button class="secondary-button" type="button" id="reselectButton" hidden>
-            Reselect People
+            Edit Face Areas
           </button>
         </div>
 

@@ -1,12 +1,13 @@
 from io import BytesIO
 from os import environ
 
-from flask import Flask, jsonify, redirect, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_file, send_from_directory
 
 
 app = Flask(__name__)
 face_recognition = None
 FACE_RECOGNITION_ERROR = None
+HEIF_REGISTERED = False
 
 
 def _load_face_recognition():
@@ -23,6 +24,60 @@ def _load_face_recognition():
 
     face_recognition = loaded_face_recognition
     return face_recognition
+
+
+def _register_heif_opener():
+    global HEIF_REGISTERED
+
+    if HEIF_REGISTERED:
+        return
+
+    try:
+        from pillow_heif import register_heif_opener
+    except Exception:
+        HEIF_REGISTERED = True
+        return
+
+    register_heif_opener()
+    HEIF_REGISTERED = True
+
+
+def _read_uploaded_image(image_file):
+    from PIL import Image, ImageOps
+
+    _register_heif_opener()
+    image = Image.open(BytesIO(image_file.read()))
+    return ImageOps.exif_transpose(image)
+
+
+def _convert_to_rgb(image):
+    from PIL import Image
+
+    if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+        rgba = image.convert("RGBA")
+        background = Image.new("RGB", image.size, (255, 255, 255))
+        background.paste(rgba, mask=rgba.getchannel("A"))
+        return background
+
+    return image.convert("RGB")
+
+
+def _optimized_jpeg(image, max_side=2400):
+    from PIL import Image
+
+    image = _convert_to_rgb(image)
+    scale = min(max_side / max(image.size), 1)
+
+    if scale < 1:
+        image = image.resize(
+            (round(image.width * scale), round(image.height * scale)),
+            Image.Resampling.LANCZOS,
+        )
+
+    output = BytesIO()
+    image.save(output, format="JPEG", quality=88, optimize=True, progressive=True)
+    output.seek(0)
+    return output
 
 
 def _face_area(location):
@@ -86,6 +141,25 @@ def health():
     )
 
 
+@app.post("/api/prepare-image")
+def prepare_image():
+    image_file = request.files.get("image")
+    if image_file is None:
+        return jsonify({"error": "이미지 파일이 전달되지 않았습니다."}), 400
+
+    try:
+        image = _read_uploaded_image(image_file)
+        optimized = _optimized_jpeg(image)
+    except Exception:
+        return jsonify({"error": "이미지를 읽을 수 없습니다."}), 400
+
+    return send_file(
+        optimized,
+        mimetype="image/jpeg",
+        download_name="facemoji-upload.jpg",
+    )
+
+
 @app.post("/api/detect-faces")
 def detect_faces():
     recognition = _load_face_recognition()
@@ -105,15 +179,14 @@ def detect_faces():
         )
 
     import numpy as np
-    from PIL import Image, ImageOps
+    from PIL import Image
 
     image_file = request.files.get("image")
     if image_file is None:
         return jsonify({"error": "이미지 파일이 전달되지 않았습니다."}), 400
 
     try:
-        image = Image.open(BytesIO(image_file.read()))
-        image = ImageOps.exif_transpose(image).convert("RGB")
+        image = _read_uploaded_image(image_file).convert("RGB")
     except Exception:
         return jsonify({"error": "이미지를 읽을 수 없습니다."}), 400
 

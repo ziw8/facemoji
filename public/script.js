@@ -57,7 +57,6 @@ let selectedEmojis = new Set();
 let currentObjectUrl = null;
 let currentImage = null;
 let detectedFaces = [];
-let selectedFaceIds = new Set();
 let imageCovered = false;
 let addFaceMode = false;
 let nextFaceId = 0;
@@ -65,6 +64,9 @@ let activePreviewSource = null;
 let activeFaceDrag = null;
 let faceRenderFrame = null;
 let resizeFrame = null;
+let imageLoadToken = 0;
+let skipNextEmojiClick = false;
+let skipNextSelectorClick = false;
 
 const emojiGroups = [
   {
@@ -978,22 +980,8 @@ function drawOriginalToResult() {
   resultCtx.drawImage(currentImage, 0, 0);
 }
 
-function toggleFaceSelection(faceId) {
-  if (selectedFaceIds.has(faceId)) {
-    selectedFaceIds.delete(faceId);
-  } else {
-    selectedFaceIds.add(faceId);
-  }
-
-  setStatus(
-    `${selectedFaceIds.size} ${selectedFaceIds.size === 1 ? "face" : "faces"} will stay visible.`
-  );
-  renderFaceLayers();
-}
-
 function removeFace(faceId) {
   detectedFaces = detectedFaces.filter((face) => face.id !== faceId);
-  selectedFaceIds.delete(faceId);
   updateFaceActionState();
   renderFaceLayers();
 
@@ -1066,17 +1054,14 @@ function endFaceDrag() {
     return;
   }
 
-  const { face, moved } = activeFaceDrag;
+  const { moved } = activeFaceDrag;
   activeFaceDrag.marker.classList.remove("dragging");
   activeFaceDrag = null;
 
   if (moved) {
     setStatus("Face area moved.");
     renderFaceLayers();
-    return;
   }
-
-  toggleFaceSelection(face.id);
 }
 
 function createFaceMarker(face, metrics, options = {}) {
@@ -1098,9 +1083,7 @@ function createFaceMarker(face, metrics, options = {}) {
 
   toggleButton.type = "button";
   toggleButton.className = "face-toggle";
-  toggleButton.setAttribute("aria-pressed", String(selectedFaceIds.has(face.id)));
-  toggleButton.setAttribute("aria-label", `Keep face ${face.id + 1} visible`);
-  toggleButton.classList.toggle("selected", selectedFaceIds.has(face.id));
+  toggleButton.setAttribute("aria-label", `Move face area ${face.id + 1}`);
 
   removeButton.type = "button";
   removeButton.className = "remove-face-button";
@@ -1167,10 +1150,10 @@ function scheduleFaceLayersRender() {
 }
 
 function resetEditor() {
+  imageLoadToken += 1;
   imageInput.value = "";
   currentImage = null;
   detectedFaces = [];
-  selectedFaceIds = new Set();
   imageCovered = false;
   nextFaceId = 0;
   setAddFaceMode(false);
@@ -1201,6 +1184,46 @@ function resetEditor() {
   }
 }
 
+function isImageFile(file) {
+  return Boolean(file) && (
+    file.type.startsWith("image/") ||
+    /\.(heic|heif|jpe?g|png|webp)$/i.test(file.name)
+  );
+}
+
+function jpegFileName(file) {
+  const name = file.name.replace(/\.[^.]*$/, "") || "facemoji-upload";
+  return `${name}.jpg`;
+}
+
+async function prepareImage(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch("/api/prepare-image", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "이미지를 읽을 수 없습니다.");
+  }
+
+  const blob = await response.blob();
+  return new File([blob], jpegFileName(file), { type: "image/jpeg" });
+}
+
+function loadImageElement(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
 async function detectFaces(file) {
   const formData = new FormData();
   formData.append("image", file);
@@ -1219,18 +1242,19 @@ async function detectFaces(file) {
   return data.faces;
 }
 
-function loadImage(file) {
-  if (!file || !file.type.startsWith("image/")) {
+async function loadImage(file) {
+  if (!isImageFile(file)) {
     setStatus(messages.genericError, true);
     return;
   }
 
   if (currentObjectUrl) {
     URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = null;
   }
 
+  currentImage = null;
   detectedFaces = [];
-  selectedFaceIds = new Set();
   imageCovered = false;
   nextFaceId = 0;
   setAddFaceMode(false);
@@ -1241,16 +1265,26 @@ function loadImage(file) {
   regenerateButton.hidden = true;
   reselectButton.hidden = true;
   resultPanel.hidden = true;
+  uploadState.hidden = false;
+  canvasWrap.hidden = true;
   imageWorkspace.classList.remove("has-result");
   dropZone.classList.remove("loaded");
   faceLayer.replaceChildren();
-  currentObjectUrl = URL.createObjectURL(file);
+  setStatus("Optimizing image...");
 
-  const image = new Image();
-  const imageUrl = currentObjectUrl;
+  const token = ++imageLoadToken;
 
-  image.onload = async () => {
-    if (currentObjectUrl !== imageUrl) {
+  try {
+    const optimizedFile = await prepareImage(file);
+
+    if (token !== imageLoadToken) {
+      return;
+    }
+
+    currentObjectUrl = URL.createObjectURL(optimizedFile);
+    const image = await loadImageElement(currentObjectUrl);
+
+    if (token !== imageLoadToken) {
       return;
     }
 
@@ -1260,45 +1294,33 @@ function loadImage(file) {
     uploadNewButton.hidden = false;
     addFaceButton.hidden = false;
     drawOriginalImage();
-    setStatus("얼굴을 인식하는 중입니다...");
+    setStatus("Detecting faces...");
 
-    try {
-      const faces = await detectFaces(file);
+    const faces = await detectFaces(optimizedFile);
 
-      if (currentObjectUrl !== imageUrl) {
-        return;
-      }
-
-      detectedFaces = faces.map((face) => ({
-        ...face,
-        manual: false,
-      }));
-      nextFaceId =
-        detectedFaces.reduce((maxId, face) => Math.max(maxId, face.id), -1) + 1;
-      renderFaceLayers();
-      updateFaceActionState();
-
-      if (detectedFaces.length === 0) {
-        setStatus(`${messages.noFaces} You can add face areas manually.`, true);
-        return;
-      }
-
-      setStatus("Select the faces you want to keep visible.");
-    } catch (error) {
-      updateFaceActionState();
-      setStatus(messages.genericError, true);
-    }
-  };
-
-  image.onerror = () => {
-    if (currentObjectUrl !== imageUrl) {
+    if (token !== imageLoadToken) {
       return;
     }
 
-    setStatus(messages.genericError, true);
-  };
+    detectedFaces = faces.map((face) => ({
+      ...face,
+      manual: false,
+    }));
+    nextFaceId =
+      detectedFaces.reduce((maxId, face) => Math.max(maxId, face.id), -1) + 1;
+    renderFaceLayers();
+    updateFaceActionState();
 
-  image.src = currentObjectUrl;
+    if (detectedFaces.length === 0) {
+      setStatus(`${messages.noFaces} You can add face areas manually.`, true);
+      return;
+    }
+
+    setStatus("Review the detected face areas.");
+  } catch (error) {
+    updateFaceActionState();
+    setStatus(messages.genericError, true);
+  }
 }
 
 function coverFaces() {
@@ -1319,10 +1341,6 @@ function coverFaces() {
   const emojis = [...selectedEmojis];
 
   detectedFaces.forEach((face) => {
-    if (selectedFaceIds.has(face.id)) {
-      return;
-    }
-
     const width = face.right - face.left;
     const height = face.bottom - face.top;
     const centerX = face.left + width / 2;
@@ -1364,7 +1382,7 @@ function reselectPeople() {
   applyImageDimensions();
   updateFaceActionState();
   renderFaceLayers();
-  setStatus("Update the faces you want to keep visible.");
+  setStatus("Edit the face areas before applying.");
 }
 
 function downloadResult() {
@@ -1494,7 +1512,28 @@ function closePreview() {
   previewFaceLayer.replaceChildren();
 }
 
+emojiGrid.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse" || event.target.closest(".remove-emoji-button")) {
+    return;
+  }
+
+  const button = event.target.closest(".emoji-option");
+
+  if (!button) {
+    return;
+  }
+
+  event.preventDefault();
+  skipNextEmojiClick = true;
+  toggleEmoji(button);
+});
+
 emojiGrid.addEventListener("click", (event) => {
+  if (skipNextEmojiClick) {
+    skipNextEmojiClick = false;
+    return;
+  }
+
   const removeButton = event.target.closest(".remove-emoji-button");
 
   if (removeButton) {
@@ -1512,7 +1551,30 @@ emojiGrid.addEventListener("click", (event) => {
   toggleEmoji(button);
 });
 
+emojiSelectorGrid.addEventListener("pointerdown", (event) => {
+  if (event.pointerType === "mouse") {
+    return;
+  }
+
+  const button = event.target.closest(".emoji-selector-option");
+
+  if (!button) {
+    return;
+  }
+
+  event.preventDefault();
+  skipNextSelectorClick = true;
+  addEmojiToList(button.dataset.emoji || button.textContent.trim());
+  renderEmojiSelector(emojiSearch.value);
+  emojiSearch.focus({ preventScroll: true });
+});
+
 emojiSelectorGrid.addEventListener("click", (event) => {
+  if (skipNextSelectorClick) {
+    skipNextSelectorClick = false;
+    return;
+  }
+
   event.stopPropagation();
   const button = event.target.closest(".emoji-selector-option");
 
