@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "python3 -m pip install --upgrade pip wheel \"setuptools<81\" && python3 -m pip install -r requirements.txt && python3 -m pip install face_recognition --no-deps && python3 -c \"import pathlib, shutil, sysconfig; site = pathlib.Path(sysconfig.get_paths()['purelib']); patterns = ('pip', 'pip-*.dist-info', 'wheel', 'wheel-*.dist-info', 'setuptools', 'setuptools-*.dist-info', '_distutils_hack'); [shutil.rmtree(path, ignore_errors=True) for pattern in patterns for path in site.glob(pattern)]\"",
+  "installCommand": "bash install.sh",
   "rewrites": [
     {
       "source": "/:path((?!api/).*)",
