@@ -16,9 +16,6 @@ patterns = (
     "pip-*.dist-info",
     "wheel",
     "wheel-*.dist-info",
-    "setuptools",
-    "setuptools-*.dist-info",
-    "_distutils_hack",
 )
 
 for pattern in patterns:
