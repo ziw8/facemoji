@@ -9,7 +9,7 @@ FACEMOJI uploads a photo, detects face areas with `face_recognition`, and covers
 .venv/bin/flask --app app run --host 127.0.0.1 --port 3000
 ```
 
-Open `facecoveremoji.vercel.app`.
+Open `emojicoverface.vercel.app`.
 
 ## Vercel Notes
 
